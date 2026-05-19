@@ -1,0 +1,24 @@
+Options -Indexes
+
+# ── Security headers ──────────────────────────────────────────────────────────
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ── Prevent direct access to config & models ──────────────────────────────────
+<FilesMatch "^(database|auth)\.php$">
+  Require all denied
+</FilesMatch>
+
+# ── Rewrite Rules ─────────────────────────────────────────────────────────────
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # API: comments delete with ID in path → /api/comments/delete.php?id=N
+  RewriteRule ^api/comments/([0-9]+)$  api/comments/delete.php?id=$1  [QSA,L]
+
+</IfModule>
