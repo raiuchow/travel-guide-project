@@ -1,7 +1,6 @@
 <?php
 session_start();
-include '../../config/db.php';
-
+$conn = mysqli_connect("localhost", "root", "", "travel_guide");
 header("Content-Type: application/json");
 
 if(!isset($_SESSION['user_id'])){
@@ -10,12 +9,12 @@ if(!isset($_SESSION['user_id'])){
 }
 
 $data = json_decode(file_get_contents("php://input"), true);
-
 $id = $data['id'];
 $user_id = $_SESSION['user_id'];
 
-$stmt = $conn->prepare("DELETE FROM wishlist WHERE id=? AND user_id=?");
-$stmt->execute([$id, $user_id]);
+$stmt = mysqli_prepare($conn, "DELETE FROM wishlist WHERE id=? AND user_id=?");
+mysqli_stmt_bind_param($stmt, "ii", $id, $user_id);
+mysqli_stmt_execute($stmt);
 
 echo json_encode(["status"=>"success","message"=>"Removed"]);
 ?>
