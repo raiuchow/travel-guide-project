@@ -1,79 +1,54 @@
 <?php
 session_start();
-include 'config/db.php';
+$conn = mysqli_connect("localhost", "root", "", "travel_guide");
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit;
-}
-
-$user_id = $_SESSION['user_id'];
 $message = "";
 
-$stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
-$stmt->execute([$user_id]);
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (isset($_POST['update_profile'])) {
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
+    $password = trim($_POST['password']);
+    $role = $_POST['role'];
 
-    $check = $conn->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
-    $check->execute([$email, $user_id]);
+    $allowed_roles = ['user', 'scout', 'admin'];
 
-    if ($check->rowCount() > 0) {
-        $message = "Email already exists!";
-    } else {
-
-        $imageName = $user['profile_image'];
-
-        if (!empty($_FILES['image']['name'])) {
-
-            $uploadDir = "public/uploads/";
-
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-
-            $imageName = time() . "_" . basename($_FILES['image']['name']);
-
-            move_uploaded_file(
-                $_FILES['image']['tmp_name'],
-                $uploadDir . $imageName
-            );
-        }
-
-        $update = $conn->prepare("UPDATE users SET name=?, email=?, profile_image=? WHERE id=?");
-        $update->execute([$name, $email, $imageName, $user_id]);
-
-        $_SESSION['name'] = $name;
-
-        $message = "Profile updated successfully!";
+    if (!in_array($role, $allowed_roles)) {
+        die("Invalid role selected");
     }
-}
 
-if (isset($_POST['change_password'])) {
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $message = "Invalid email format";
+    }
 
-    $current = $_POST['current_password'];
-    $new = $_POST['new_password'];
+    elseif (strlen($password) < 8) {
+        $message = "Password must be at least 8 characters";
+    }
 
-    if (password_verify($current, $user['password_hash'])) {
+    else {
 
-        if (strlen($new) < 8) {
-            $message = "Password must be at least 8 characters!";
-        } else {
+        $check = mysqli_prepare($conn, "SELECT id FROM users WHERE email = ?");
+        mysqli_stmt_bind_param($check, "s", $email);
+        mysqli_stmt_execute($check);
+        mysqli_stmt_store_result($check);
 
-            $hash = password_hash($new, PASSWORD_DEFAULT);
-
-            $update = $conn->prepare("UPDATE users SET password_hash=? WHERE id=?");
-            $update->execute([$hash, $user_id]);
-
-            $message = "Password changed successfully!";
+        if (mysqli_stmt_num_rows($check) > 0) {
+            $message = "Email already exists";
         }
 
-    } else {
-        $message = "Current password is wrong!";
+        else {
+
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+
+            $stmt = mysqli_prepare($conn, "INSERT INTO users (name, email, password_hash, role, is_verified) VALUES (?, ?, ?, ?, 0)");
+            mysqli_stmt_bind_param($stmt, "ssss", $name, $email, $hash, $role);
+            mysqli_stmt_execute($stmt);
+
+            $_SESSION['message'] = "Registration Successful 🎉 Wait for admin approval.";
+
+            header("Location: login.php");
+            exit;
+        }
     }
 }
 ?>
