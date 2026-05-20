@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'config/db.php';
+$conn = mysqli_connect("localhost", "root", "", "travel_guide");
 
 $message = "";
 
@@ -8,9 +8,11 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_me'])) {
 
     $token = hash('sha256', $_COOKIE['remember_me']);
 
-    $stmt = $conn->prepare("SELECT * FROM users WHERE remember_token = ?");
-    $stmt->execute([$token]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt = mysqli_prepare($conn, "SELECT * FROM users WHERE remember_token = ?");
+    mysqli_stmt_bind_param($stmt, "s", $token);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $user = mysqli_fetch_assoc($result);
 
     if ($user && $user['is_verified'] == 1) {
         $_SESSION['user_id'] = $user['id'];
@@ -27,9 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
 
-    $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt = mysqli_prepare($conn, "SELECT * FROM users WHERE email = ?");
+    mysqli_stmt_bind_param($stmt, "s", $email);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $user = mysqli_fetch_assoc($result);
 
     if ($user) {
 
@@ -48,15 +52,11 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
                 $token = bin2hex(random_bytes(32));
                 $hashedToken = hash('sha256', $token);
 
-                $update = $conn->prepare("UPDATE users SET remember_token = ? WHERE id = ?");
-                $update->execute([$hashedToken, $user['id']]);
+                $update = mysqli_prepare($conn, "UPDATE users SET remember_token = ? WHERE id = ?");
+                mysqli_stmt_bind_param($update, "si", $hashedToken, $user['id']);
+                mysqli_stmt_execute($update);
 
-                setcookie(
-                    "remember_me",
-                    $token,
-                    time() + (30 * 24 * 60 * 60),
-                    "/"
-                );
+                setcookie("remember_me", $token, time() + (30 * 24 * 60 * 60), "/");
             }
 
             header("Location: home.php");
