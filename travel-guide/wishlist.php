@@ -1,22 +1,23 @@
 <?php
 session_start();
-include 'config/db.php';
+$conn = mysqli_connect("localhost", "root", "", "travel_guide");
 
 if(!isset($_SESSION['user_id'])){
     header("Location: login.php");
     exit;
 }
 
-// get wishlist items
-$stmt = $conn->prepare("
+$stmt = mysqli_prepare($conn, "
 SELECT w.id, p.title, p.country, p.cost_level
 FROM wishlist w
 JOIN posts p ON w.post_id = p.id
 WHERE w.user_id=?
 ");
 
-$stmt->execute([$_SESSION['user_id']]);
-$items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+mysqli_stmt_bind_param($stmt, "i", $_SESSION['user_id']);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+$items = mysqli_fetch_all($result, MYSQLI_ASSOC);
 ?>
 
 <!DOCTYPE html>
