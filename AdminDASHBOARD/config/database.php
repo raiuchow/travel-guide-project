@@ -6,14 +6,13 @@ class Database {
     private $pass = '';
 
     public function connect() {
-        $dsn = "mysql:host={$this->host};dbname={$this->db};charset=utf8mb4";
-        try {
-            return new PDO($dsn, $this->user, $this->pass, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-            ]);
-        } catch (PDOException $e) {
+        $conn = mysqli_connect($this->host, $this->user, $this->pass, $this->db);
+
+        if (!$conn) {
             die('Database connection failed');
         }
+
+        mysqli_set_charset($conn, 'utf8mb4');
+        return $conn;
     }
 }
