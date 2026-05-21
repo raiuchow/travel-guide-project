@@ -1,57 +1,46 @@
 <?php
-/**
- * Login Page - Simple Version
- */
 
-session_start();
+require_once __DIR__ . '/bootstrap/autoload.php';
+require_once __DIR__ . '/bootstrap/helpers.php';
 
-// Database connection
-try {
-    $pdo = new PDO(
-        "mysql:host=localhost;dbname=scout_db;charset=utf8mb4",
-        "root",
-        "",
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ]
-    );
-} catch (PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
-}
+use Config\Database;
+use App\Services\AuthService;
 
-// Check if already logged in
-if (isset($_SESSION['user_id'])) {
-    header('Location: /scout/my_requests.php');
+// Already logged in → redirect
+if (AuthService::isLoggedIn()) {
+    header('Location: ' . appUrl('scout/my_requests.php'));
     exit;
 }
 
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $email    = trim($_POST['email']    ?? '');
+    $password =      $_POST['password'] ?? '';
 
     if (empty($email) || empty($password)) {
         $error = 'Please fill in all fields.';
     } else {
-        // Fetch user from database
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email LIMIT 1");
-        $stmt->execute([':email' => $email]);
-        $user = $stmt->fetch();
+        $db   = Database::getInstance();
+        $conn = $db->getConnection(); // \mysqli
+
+        // Prepared statement — prevents SQL injection
+        $stmt = $conn->prepare("SELECT * FROM users WHERE email = ? LIMIT 1");
+        $stmt->bind_param('s', $email);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $user   = $result->fetch_assoc();
+        $stmt->close();
 
         if ($user) {
-            // Plain password comparison (NOT SECURE - only for testing)
-            if ($password === $user['password_hash'] && $user['role'] === 'scout' && $user['is_verified']) {
-                // Login successful
-                session_regenerate_id(true);
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['name'] = $user['name'];
-                $_SESSION['email'] = $user['email'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['is_verified'] = $user['is_verified'];
-                
-                header('Location: /scout/my_requests.php');
+            // Verify password (password_verify for hashed, plain compare for legacy)
+            $passwordOk = password_verify($password, $user['password_hash'])
+                       || $password === $user['password_hash']; // fallback for plain-text dev data
+
+            if ($passwordOk && $user['role'] === 'scout' && $user['is_verified']) {
+                AuthService::login($user);
+                header('Location: ' . appUrl('scout/my_requests.php'));
                 exit;
             } else {
                 $error = 'Only verified scouts can access this system.';
